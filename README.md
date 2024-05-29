@@ -1,9 +1,10 @@
 # SFSORT: Scene Features-based Simple Online Real-Time Tracker
 
-## Finding the Path to the Comprehensive Explanation
-Full details are available at https://arxiv.org/abs/2404.07553
+# Examples
+There are two files available containing simple inference through ONNX models in form of [YOLOv7](https://github.com/Applied-Deep-Learning-Lab/SFSORT/blob/main/yolov7_onnxruntime_sfsort.py) and [Ultralytics](https://github.com/Applied-Deep-Learning-Lab/SFSORT/blob/main/yolov8_ultralytics_sfsort.py) framework.
 
 ## Citation
+Original creator's paper is available at https://arxiv.org/abs/2404.07553
 ```
 @misc{sfsort,
     title={SFSORT: Scene Features-based Simple Online Real-Time Tracker},
