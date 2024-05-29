@@ -19,7 +19,7 @@ def remove_stale_keys(data_dict, heartbeat_dict, max_age_seconds):
 names = session.names
 
 # Load the video file
-cap = cv2.VideoCapture('excavator.mp4')
+cap = cv2.VideoCapture('Sample.mp4')
 fps = cap.get(cv2.CAP_PROP_FPS)
 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
