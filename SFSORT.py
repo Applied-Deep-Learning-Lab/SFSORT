@@ -60,6 +60,17 @@ class SFSORT:
 
     def __init__(self, args):
         """Initialize a tracker with given arguments"""
+        # Initialize tracker's arguments
+        self.update_args(args)
+
+        # Initialize the tracker
+        self.frame_no = 0
+        self.id_counter = 0
+        self.active_tracks = []
+        self.lost_tracks = []
+
+    def update_args(self, args):
+        """Updates tracker's arguments"""
         args = DotAccess(args)
         # Register tracking arguments
 
@@ -83,12 +94,6 @@ class SFSORT:
         self.t_margin = args.vertical_margin
         self.r_margin = args.frame_width - args.horizontal_margin
         self.b_margin = args.frame_height - args.vertical_margin
-
-        # Initialize the tracker
-        self.frame_no = 0
-        self.id_counter = 0
-        self.active_tracks = []
-        self.lost_tracks = []
 
     def update(self, boxes, scores):
         """Updates tracker with new detections"""
