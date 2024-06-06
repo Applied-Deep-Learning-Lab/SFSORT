@@ -41,13 +41,6 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleu
     im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
     return im, r, (dw, dh)
 
-def remove_stale_keys(data_dict, heartbeat_dict, max_age_seconds):
-    now = time.time()
-    for key, last_update_time in list(heartbeat_dict.items()):
-        if now - last_update_time > max_age_seconds:
-            del data_dict[key]
-            del heartbeat_dict[key]
-
 # All classes
 names = ['bike', 'bus', 'car', 'construction equipment', 'emergency', 'motorbike', 'personal mobility', 'quad bike', 'truck']
 
@@ -77,12 +70,6 @@ tracker_arguments = {"dynamic_tuning": True, "cth": 0.7,
 tracker = SFSORT(tracker_arguments)
 # Define a color list for track visualization
 colors = {}
-# Define the moving average window size (e.g., 5 frames)
-window_size = 5
-# Initialize a dictionary to store the moving average values for each track_id
-moving_avg_dict = {}
-# Create a dictionary to store the last update time for each track_id
-last_update_times = {}
 
 # Process each frame of the video
 while cap.isOpened():
@@ -108,11 +95,11 @@ while cap.isOpened():
    inp = {inname[0]:im}
 
    # ONNX inference
-   outputs = session.run(outname, inp)[0]
+   outputs = session.run(outname, inp)[0]    # batch_id,x0,y0,x1,y1,cls_id,score
 
    start_tracker_time = time.time()
    # Update the tracker with the latest detections
-   tracks = tracker.update(outputs[:, 1:5], outputs[:, 6])  # batch_id,x0,y0,x1,y1,cls_id,score
+   tracks = tracker.update(outputs[:, 1:5], outputs[:, 6], outputs[:, 5])
    end_tracker_time = time.time() - start_tracker_time
 
    # Skip additional analysis if the tracker is not currently tracking anyone
@@ -121,16 +108,15 @@ while cap.isOpened():
       continue
    
    # Extract tracking data from the tracker
-   bbox_list = tracks[:, 0]
-   track_id_list = tracks[:, 1]
+   bbox_list      = tracks[:, 0]
+   track_id_list  = tracks[:, 1]
+   cls_id_list    = tracks[:, 2]
+   scores_list    = tracks[:, 3]
 
    # Visualize tracks
    start_postprocess_time = time.time()
-   for idx, (track_id, bbox) in enumerate(zip(track_id_list, bbox_list)):
-      # Find the corresponding detection in the outputs array
-      detection_idx = np.where(outputs[:, 1:5] == bbox)[0][0]
-      cls_id = int(outputs[detection_idx, 5])  # Get the current class_id value
-      score = round(float(outputs[detection_idx, 6]), 2)
+   for _, (track_id, bbox, cls_id, score) in enumerate(
+       zip(track_id_list, bbox_list, cls_id_list, scores_list)):
 
       # Define a new color for newly detected tracks
       if track_id not in colors:
@@ -142,25 +128,14 @@ while cap.isOpened():
 
       # Extract the bounding box coordinates
       x0, y0, x1, y1 = bbox
-
+      # Scale the box back to original frame size
       box = np.array([x0,y0,x1,y1])
       box -= np.array(dwdh*2)
       box /= ratio
       box = box.round().astype(np.int32).tolist()
 
-      # Calculate the moving average of class_id values for this track_id
-      if track_id in moving_avg_dict:
-         moving_avg_dict[track_id].append(cls_id)
-         last_update_times[track_id] = time.time()
-         if len(moving_avg_dict[track_id]) > window_size:
-            moving_avg_dict[track_id].pop(0)
-         smoothed_cls_id = int(sum(moving_avg_dict[track_id]) / len(moving_avg_dict[track_id]))
-      else:
-         moving_avg_dict[track_id] = [cls_id]
-         last_update_times[track_id] = time.time()
-         smoothed_cls_id = cls_id
-
-      name = names[smoothed_cls_id]
+      # Assign names to detected classes
+      name = names[cls_id]
       name += ' '+str(score)
 
       # Draw the bounding boxes on the frame
@@ -168,11 +143,7 @@ while cap.isOpened():
       cv2.putText(annotated_frame, name+' '+str(track_id),
                   (box[0], box[1]-5),
                   cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, thickness=2) 
-      
-   # After some time remove track_ids from moving_avg algo
-   remove_stale_keys(moving_avg_dict,
-                     last_update_times,
-                     30)
+
    # Measure and visualize timers
    end_postprocess_time = time.time() - start_postprocess_time
    elapsed_time = time.time() - start_time

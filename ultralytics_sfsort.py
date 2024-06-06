@@ -57,6 +57,7 @@ while cap.isOpened():
        prediction_results.conf,
        prediction_results.cls)
    end_tracker_time = time.time() - start_tracker_time
+
    # Skip additional analysis if the tracker is not currently tracking anyone
    if len(tracks) == 0:
       out.write(frame)
@@ -70,8 +71,8 @@ while cap.isOpened():
 
    # Visualize tracks
    start_postprocess_time = time.time()
-   for _, (track_id, bbox, cls_id, score) \
-   in enumerate(zip(track_id_list, bbox_list, cls_id_list, scores_list)):
+   for _, (track_id, bbox, cls_id, score) in enumerate(
+       zip(track_id_list, bbox_list, cls_id_list, scores_list)):
 
       # Define a new color for newly detected tracks
       if track_id not in colors:
