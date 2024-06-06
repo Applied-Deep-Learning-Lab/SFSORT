@@ -1,16 +1,3 @@
-# ******************************************************************** #
-# ****************** Sharif University of Technology ***************** #
-# *************** Department of Electrical Engineering *************** #
-# ************************ Deep Learning Lab ************************* #
-# ************************ SFSORT Version 4.0 ************************ #
-# ************ Authors: Mehrdad Morsali - Zeinab Sharifi ************* #
-# *********** mehrdadmorsali@gmail.com - zsh.5ooo@gmail.com ********** #
-# ******************************************************************** #
-
-
-# ******************************************************************** #
-# ********************** Packages and Libraries ********************** #
-# ******************************************************************** #
 import numpy as np
 
 
@@ -21,9 +8,7 @@ except ImportError:
     from scipy.optimize import linear_sum_assignment
     use_lap=False
 
-# ******************************************************************** #
-# ***************************** Classes ****************************** #
-# ******************************************************************** #
+
 class DotAccess(dict):
     """Provides dot.notation access to dictionary attributes"""
     __getattr__ = dict.get
@@ -41,16 +26,20 @@ class TrackState:
 class Track:
     """Handles basic track attributes and operations"""
 
-    def __init__(self, bbox, frame_id, track_id):
+    def __init__(self, bbox, frame_id, track_id, cls_id, score):
         """Track initialization"""
         self.track_id = track_id
         self.bbox = bbox
+        self.cls_id = cls_id
+        self.score = score
         self.state = TrackState.Active
         self.last_frame = frame_id
 
-    def update(self, box, frame_id):
+    def update(self, bbox, frame_id, cls_id, score):
         """Updates a matched track"""
-        self.bbox = box
+        self.bbox = bbox
+        self.cls_id = cls_id
+        self.score = score
         self.state = TrackState.Active
         self.last_frame = frame_id
 
@@ -95,7 +84,7 @@ class SFSORT:
         self.r_margin = args.frame_width - args.horizontal_margin
         self.b_margin = args.frame_height - args.vertical_margin
 
-    def update(self, boxes, scores):
+    def update(self, boxes, scores, class_ids):
         """Updates tracker with new detections"""
         # Adjust dynamic arguments
         count = len(scores[scores>self.cth])
@@ -134,14 +123,17 @@ class SFSORT:
         if high_score.any():
             definite_boxes = boxes[high_score]
             definite_scores = scores[high_score]
+            definite_classes = class_ids[high_score]
             if track_pool:
                 cost = self.calculate_cost(track_pool, definite_boxes)
                 matches, unmatched_tracks, unmatched_detections = self.linear_assignment(cost, mth)
                 # Update/Activate matched tracks
                 for track_idx, detection_idx in matches:
                     box = definite_boxes[detection_idx]
+                    class_id = definite_classes[detection_idx]
+                    score = definite_scores[detection_idx]
                     track = track_pool[track_idx]
-                    track.update(box, self.frame_no)
+                    track.update(box, self.frame_no, class_id, score)
                     next_active_tracks.append(track)
                     # Remove re-identified tracks from lost list
                     if track in self.lost_tracks:
@@ -150,7 +142,9 @@ class SFSORT:
                 for detection_idx in unmatched_detections:
                     if definite_scores[detection_idx] > nth:
                         box = definite_boxes[detection_idx]
-                        track = Track(box, self.frame_no, self.id_counter)
+                        class_id = definite_classes[detection_idx]
+                        score = definite_scores[detection_idx]
+                        track = Track(box, self.frame_no, self.id_counter, class_id, score)
                         next_active_tracks.append(track)
                         self.id_counter += 1
             else:
@@ -158,7 +152,9 @@ class SFSORT:
                 for detection_idx, score in enumerate(definite_scores):
                     if score > nth:
                         box = definite_boxes[detection_idx]
-                        track = Track(box, self.frame_no, self.id_counter)
+                        class_id = definite_classes[detection_idx]
+                        score = definite_scores[detection_idx]
+                        track = Track(box, self.frame_no, self.id_counter, class_id, score)
                         next_active_tracks.append(track)
                         self.id_counter += 1
 
@@ -173,13 +169,17 @@ class SFSORT:
         if intermediate_score.any():
             if len(unmatched_tracks):
                 possible_boxes = boxes[intermediate_score]
+                possible_class_ids = class_ids[intermediate_score]
+                possible_scores = scores[intermediate_score]
                 cost = self.calculate_cost(unmatched_track_pool, possible_boxes, iou_only=True)
                 matches, unmatched_tracks, unmatched_detections = self.linear_assignment(cost, self.match_th_second)
                 # Update/Activate matched tracks
                 for track_idx, detection_idx in matches:
                     box = possible_boxes[detection_idx]
+                    class_id = possible_class_ids[detection_idx]
+                    score = possible_scores[detection_idx]
                     track = unmatched_track_pool[track_idx]
-                    track.update(box, self.frame_no)
+                    track.update(box, self.frame_no, class_id, score)
                     next_active_tracks.append(track)
                     # Remove re-identified tracks from lost list
                     if track in self.lost_tracks:
@@ -204,7 +204,7 @@ class SFSORT:
         # Update the list of active tracks
         self.active_tracks = next_active_tracks.copy()
 
-        return np.asarray([[x.bbox, x.track_id] for x in next_active_tracks], dtype=object)
+        return np.asarray([[x.bbox, x.track_id, x.cls_id, round(x.score, 2)] for x in next_active_tracks], dtype=object)
 
     @staticmethod
     def calculate_cost(tracks, boxes, iou_only=False):

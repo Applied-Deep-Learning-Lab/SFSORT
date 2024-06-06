@@ -1,20 +1,11 @@
 import random
 import time
 import cv2
-import numpy as np
 from ultralytics import YOLO
 from SFSORT import SFSORT
 
 # Model loading
 session = YOLO('yolov8m.pt', task='detect')
-
-def remove_stale_keys(data_dict, heartbeat_dict, max_age_seconds):
-    now = time.time()
-    for key, last_update_time in list(heartbeat_dict.items()):
-        if now - last_update_time > max_age_seconds:
-            del data_dict[key]
-            del heartbeat_dict[key]
-
 # All classes
 names = session.names
 
@@ -39,17 +30,11 @@ tracker_arguments = {"dynamic_tuning": True, "cth": 0.7,
                      "horizontal_margin": width // 10,
                      "vertical_margin": height // 10,
                      "frame_width": width,
-                     "frame_height": height}
+                     "frame_height": height,}
 # Instantiate a tracker
 tracker = SFSORT(tracker_arguments)
 # Define a color list for track visualization
 colors = {}
-# Define the moving average window size (e.g., 5 frames)
-window_size = 5
-# Initialize a dictionary to store the moving average values for each track_id
-moving_avg_dict = {}
-# Create a dictionary to store the last update time for each track_id
-last_update_times = {}
 
 # Process each frame of the video
 while cap.isOpened():
@@ -61,32 +46,32 @@ while cap.isOpened():
 
    # Detect people in the frame
    prediction = session.predict(frame, imgsz=640, conf=0.1, iou=0.45,
-                                half=False, max_det=99, verbose=False)
-
+                                half=False, max_det=100, verbose=False)
    # Exclude additional information from the predictions
    prediction_results = prediction[0].boxes.cpu().numpy()
 
    start_tracker_time = time.time()
    # Update the tracker with the latest detections
-   tracks = tracker.update(prediction_results.xyxy, prediction_results.conf)
+   tracks = tracker.update(
+       prediction_results.xyxy,
+       prediction_results.conf,
+       prediction_results.cls)
    end_tracker_time = time.time() - start_tracker_time
-
    # Skip additional analysis if the tracker is not currently tracking anyone
    if len(tracks) == 0:
       out.write(frame)
       continue
-   
+
    # Extract tracking data from the tracker
-   bbox_list = tracks[:, 0]
-   track_id_list = tracks[:, 1]
+   bbox_list      = tracks[:, 0]
+   track_id_list  = tracks[:, 1]
+   cls_id_list    = tracks[:, 2]
+   scores_list    = tracks[:, 3]
 
    # Visualize tracks
    start_postprocess_time = time.time()
-   for idx, (track_id, bbox) in enumerate(zip(track_id_list, bbox_list)):
-      # Find the corresponding detection in the outputs array
-      detection_idx = np.where(prediction_results.xyxy == bbox)[0][0]
-      cls_id = int(prediction_results.cls[detection_idx])  # Get the current class_id value
-      score = round(float(prediction_results.conf[detection_idx]), 2)
+   for _, (track_id, bbox, cls_id, score) \
+   in enumerate(zip(track_id_list, bbox_list, cls_id_list, scores_list)):
 
       # Define a new color for newly detected tracks
       if track_id not in colors:
@@ -98,20 +83,8 @@ while cap.isOpened():
 
       # Extract the bounding box coordinates
       x0, y0, x1, y1 = map(int, bbox)
-
-      # Calculate the moving average of class_id values for this track_id
-      if track_id in moving_avg_dict:
-         moving_avg_dict[track_id].append(cls_id)
-         last_update_times[track_id] = time.time()
-         if len(moving_avg_dict[track_id]) > window_size:
-            moving_avg_dict[track_id].pop(0)
-         smoothed_cls_id = int(sum(moving_avg_dict[track_id]) / len(moving_avg_dict[track_id]))
-      else:
-         moving_avg_dict[track_id] = [cls_id]
-         last_update_times[track_id] = time.time()
-         smoothed_cls_id = cls_id
-
-      name = names[smoothed_cls_id]
+      # Assign names to detected classes
+      name = names[cls_id]
       name += ' '+str(score)
 
       # Draw the bounding boxes on the frame
@@ -120,10 +93,6 @@ while cap.isOpened():
                   (x0, y0-5),
                   cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, thickness=2) 
 
-   # After some time remove track_ids from moving_avg algo
-   remove_stale_keys(moving_avg_dict,
-                     last_update_times,
-                     30)
    # Measure and visualize timers
    end_postprocess_time = time.time() - start_postprocess_time
    elapsed_time = time.time() - start_time
