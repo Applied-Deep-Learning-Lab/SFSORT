@@ -7,7 +7,7 @@ from SFSORT import SFSORT
 
 # Model loading
 providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-session = ort.InferenceSession('cartype.onnx', providers=providers)
+session = ort.InferenceSession('cartype_v2.onnx', providers=providers)
 
 
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleup=True, stride=32):
@@ -55,17 +55,17 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 out = cv2.VideoWriter('output.mp4', fourcc, fps, (width, height))
 
 # Organize tracker arguments into standard format
-tracker_arguments = {"dynamic_tuning": True, "cth": 0.7,
+tracker_arguments = {"dynamic_tuning": True, "cth": 0.5,
                      "high_th": 0.7, "high_th_m": 0.1,
-                     "match_th_first": 0.6, "match_th_first_m": 0.05,
-                     "match_th_second": 0.4, "low_th": 0.2,
-                     "new_track_th": 0.5, "new_track_th_m": 0.1,
+                     "match_th_first": 0.5, "match_th_first_m": 0.05,
+                     "match_th_second": 0.1, "low_th": 0.2,
+                     "new_track_th": 0.3, "new_track_th_m": 0.1,
                      "marginal_timeout": (7 * fps // 10),
                      "central_timeout": fps,
                      "horizontal_margin": width // 10,
                      "vertical_margin": height // 10,
-                     "frame_width": width,
-                     "frame_height": height}
+                     "frame_width": 640,
+                     "frame_height": 640}
 # Instantiate a tracker
 tracker = SFSORT(tracker_arguments)
 # Define a color list for track visualization
@@ -135,7 +135,7 @@ while cap.isOpened():
       box = box.round().astype(np.int32).tolist()
 
       # Assign names to detected classes
-      name = names[cls_id]
+      name = names[int(cls_id)]
       name += ' '+str(score)
 
       # Draw the bounding boxes on the frame
