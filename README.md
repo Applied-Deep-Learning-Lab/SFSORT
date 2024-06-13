@@ -1,6 +1,6 @@
 # SFSORT: Scene Features-based Simple Online Real-Time Tracker
 
-Documentation is available at https://applied-deep-learning-lab.github.io/sfsort
+Documentation is available at https://applied-deep-learning-lab.github.io/SFSORT/
 
 ## Citation
 Original creator's paper is available at https://arxiv.org/abs/2404.07553
