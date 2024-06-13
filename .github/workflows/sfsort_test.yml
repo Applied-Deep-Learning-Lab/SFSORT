@@ -11,5 +11,5 @@ jobs:
       - name: Install dependencies
         run: |
           pip install ultralytics
-      - name: Run Python module with hidden artifacts
-        run: python ultralytics_sfsort.py
+      - name: Run Python module to test if tracker works correctly
+        run: python3 ultralytics_sfsort.py

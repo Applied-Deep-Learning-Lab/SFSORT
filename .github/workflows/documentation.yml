@@ -9,7 +9,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install pdoc3
-        run: pip install pdoc3
+        run: pip install pdoc3 numpy lap
       - name: Generate documentation
         run: pdoc --html SFSORT.py -o docs --force
       - name: Rename generated page to index.html
