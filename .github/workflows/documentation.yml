@@ -11,7 +11,7 @@ jobs:
       - name: Install numpy
         run: pip install numpy
       - name: Install requirements
-        run: pip install pdoc3 lap
+        run: pip install pdoc3 lapx
       - name: Generate documentation
         run: pdoc --html SFSORT.py -o docs --force
       - name: Rename generated page to index.html
