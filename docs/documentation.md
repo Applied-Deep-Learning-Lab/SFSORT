@@ -2,13 +2,9 @@ Quickstart
 ----------
 There are two files available for a quickstart with this tracker:
 
-* through ONNX model in form of YOLOv7 [here].
+* through ONNX model in form of YOLOv7 [here](https://github.com/Applied-Deep-Learning-Lab/SFSORT/blob/main/yolov7_onnxruntime_sfsort.py).
 
-[here]: https://github.com/Applied-Deep-Learning-Lab/SFSORT/blob/main/yolov7_onnxruntime_sfsort.py
-
-* for any model in Ultralytics framework [here].
-
-[here]: https://github.com/Applied-Deep-Learning-Lab/SFSORT/blob/main/ultralytics_sfsort.py
+* for any model in Ultralytics framework [here](https://github.com/Applied-Deep-Learning-Lab/SFSORT/blob/main/ultralytics_sfsort.py).
 
 Usage
 -----

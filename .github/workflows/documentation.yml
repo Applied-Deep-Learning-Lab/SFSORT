@@ -11,8 +11,16 @@ jobs:
       - name: Install numpy
         run: pip install numpy
       - name: Install requirements
-        run: pip install pdoc3 lapx
+        run: pip install pdoc lapx
       - name: Generate documentation
-        run: pdoc --html SFSORT.py -o docs --force
-      - name: Rename generated page to index.html
-        run: mv ./docs/SFSORT.html ./docs/index.html
+        run: pdoc ./SFSORT.py -t styles/ -o docs/ -d numpy
+      - name: Commit changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/
+          git commit -m "Automatically generated documentation" || echo "No changes to commit"
+          git push origin HEAD
+          
