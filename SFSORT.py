@@ -1,31 +1,32 @@
-"""This module contains the SFSORT object detection tracker
-implementation. By introducing a novel cost function called
-the Bounding Box Similarity Index, this project eliminates
-the Kalman Filter, leading to reduced computational requirements.
+"""This module contains the SFSORT object detection tracker implementation.
+
+By introducing a novel cost function called the Bounding Box Similarity Index,
+this project eliminates the Kalman Filter, leading to reduced computational requirements.
 
 .. include:: ./docs/documentation.md
 """
 import numpy as np
 
-# It is best to use (lapjv)[https://github.com/gatagat/lap]
+# It is best to use lapx (https://github.com/rathaROG/lapx)
 # since the time to solve the linear assignment problem
-# is the shortest for this implementation
-use_lap=True
+# is the shortest for this implementation and it also
+# supports Python 3.12
+use_lap = True
 try:
     import lap
 except ImportError:
     from scipy.optimize import linear_sum_assignment
-    use_lap=False
+    use_lap = False
 
 
 class DotAccess(dict):
     """
-    Provides dot.notation access to dictionary attributes
+    Provides dot notation access to dictionary attributes.
 
     Parameters
     ----------
-    dict : dictionary
-        The dictionary to access with dot notation
+    dict : dict
+        The dictionary to access with dot notation.
 
     Examples
     --------
@@ -42,16 +43,16 @@ class DotAccess(dict):
 
 class TrackState:
     """
-    Enumeration of possible states of a track
+    Enumeration of possible states of a track.
 
     Attributes
     ----------
     Active : int
-        The track is active
+        The track is active.
     Lost_Central : int
-        The track is lost in the central region
+        The track is lost in the central region.
     Lost_Marginal : int
-        The track is lost in the marginal region
+        The track is lost in the marginal region.
     """
     Active = 0
     Lost_Central = 1
@@ -60,35 +61,35 @@ class TrackState:
 
 class Track:
     """
-    Handles basic track attributes and operations
+    Handles basic track attributes and operations.
 
     Parameters
     ----------
     bbox : array_like
-        The bounding box of the track
+        The bounding box of the track.
     frame_id : int
-        The frame ID of the track
+        The frame ID of the track.
     track_id : int
-        The track ID
+        The track ID.
     cls_id : int
-        The class ID of the track
+        The class ID of the track.
     score : float
-        The score of the track
+        The score of the track.
 
     Attributes
     ----------
     track_id : int
-        The track ID
+        The track ID.
     bbox : array_like
-        The bounding box of the track
+        The bounding box of the track.
     cls_id : int
-        The class ID of the track
+        The class ID of the track.
     score : float
-        The score of the track
+        The score of the track.
     state : int
-        The state of the track (active, lost central, or lost marginal)
+        The state of the track (active, lost central, or lost marginal).
     last_frame : int
-        The last frame ID of the track
+        The last frame ID of the track.
 
     Examples
     --------
@@ -105,7 +106,20 @@ class Track:
         self.state = TrackState.Active
 
     def update(self, bbox, frame_id, cls_id, score):
-        """Updates a matched track"""
+        """
+        Updates a matched track.
+
+        Parameters
+        ----------
+        bbox : array_like
+            The new bounding box of the track.
+        frame_id : int
+            The new frame ID.
+        cls_id : int
+            The new class ID.
+        score : float
+            The new score.
+        """
         self.bbox = bbox
         self.cls_id = cls_id
         self.score = score
@@ -115,60 +129,56 @@ class Track:
 
 class SFSORT:
     """
-    Multi-Object Tracking System
+    Multi-Object Tracking System.
 
     Parameters
     ----------
-    args : dictionary
-        The arguments for the tracker
+    args : dict
+        The arguments for the tracker.
 
     Attributes
     ----------
     frame_no : int
-        The current frame number
+        The current frame number.
     id_counter : int
-        The track ID counter
+        The track ID counter.
     active_tracks : list
-        The list of active tracks
+        The list of active tracks.
     lost_tracks : list
-        The list of lost tracks
+        The list of lost tracks.
 
     Examples
     --------
     >>> tracker = SFSORT({'low_th': 0.5, 'match_th_second': 0.7})
     >>> tracks = tracker.update([[124, 112, 327, 450], [234, 56, 261, 563]],
-                                [0.8, 0.9],
-                                [0, 1])
-    >>> bbox_list      = tracks[:, 0]
-    >>> track_id_list  = tracks[:, 1]
-    >>> cls_id_list    = tracks[:, 2]
-    >>> scores_list    = tracks[:, 3]
+    ...                         [0.8, 0.9],
+    ...                         [0, 1])
+    >>> bbox_list = tracks[:, 0]
+    >>> track_id_list = tracks[:, 1]
+    >>> cls_id_list = tracks[:, 2]
+    >>> scores_list = tracks[:, 3]
     """
 
     def __init__(self, args):
-        # Initialize tracker's arguments
         self.update_args(args)
-
-        # Initialize the tracker
         self.frame_no = 0
         self.id_counter = 0
         self.active_tracks = []
         self.lost_tracks = []
 
     def update_args(self, args):
-        """Updates tracker's arguments
+        """
+        Updates tracker's arguments.
 
         Parameters
         ----------
         args : dict
-            Tracker parameters
+            Tracker parameters.
         """
         args = DotAccess(args)
         # Register tracking arguments
-
         self.low_th = args.low_th
         self.match_th_second = args.match_th_second
-
         self.high_th = args.high_th
         self.match_th_first = args.match_th_first
         self.new_track_th = args.new_track_th
@@ -179,7 +189,6 @@ class SFSORT:
             self.nthm = args.new_track_th_m if args.new_track_th_m else 0
             self.mthm = args.match_th_first_m if args.match_th_first_m else 0
 
-
         self.marginal_timeout = args.marginal_timeout
         self.central_timeout = args.central_timeout
         self.l_margin = args.horizontal_margin
@@ -188,20 +197,22 @@ class SFSORT:
         self.b_margin = args.frame_height - args.vertical_margin
 
     def update(self, boxes, scores, class_ids):
-        """Updates tracker with new detections
+        """
+        Updates tracker with new detections.
 
         Parameters
         ----------
-        boxes : array
-            Bounding boxes coordinates
-        scores : array
-            Neural network confidence values
-        class_ids: array
-            Detected class for an object
+        boxes : array_like
+            Bounding boxes coordinates.
+        scores : array_like
+            Neural network confidence values.
+        class_ids : array_like
+            Detected class for an object.
+
         Returns
         -------
-        result : array
-            All of the inputs plus track IDs for actively tracked objects
+        result : ndarray
+            All of the inputs plus track IDs for actively tracked objects.
         """
         # Adjust dynamic arguments
         count = len(scores[scores>self.cth])
@@ -331,21 +342,21 @@ class SFSORT:
     @staticmethod
     def calculate_cost(tracks, boxes, iou_only=False):
         """
-        Calculates the association cost based on IoU and box similarity
+        Calculates the association cost based on IoU and box similarity.
 
         Parameters
         ----------
         tracks : list
-            The list of tracks
+            The list of Track object.
         boxes : array_like
-            The list of bounding boxes
+            The list of bounding boxes.
         iou_only : bool, optional
-            Whether to calculate IoU only (default is False)
+            Whether to calculate IoU only, by default False.
 
         Returns
         -------
-        cost_matrix : array
-            The association cost matrix
+        cost_matrix : ndarray
+            The association cost matrix.
         """
         eps = 1e-7
         active_boxes = [track.bbox for track in tracks]
@@ -410,23 +421,23 @@ class SFSORT:
     @staticmethod
     def linear_assignment(cost_matrix, thresh):
         """
-        Linear assignment
+        Performs linear assignment.
 
         Parameters
         ----------
-        cost_matrix : array
-            The association cost matrix
+        cost_matrix : ndarray
+            The association cost matrix.
         thresh : float
-            The threshold for the linear assignment
+            The threshold for the linear assignment.
 
         Returns
         -------
-        matches : array
-            The matched indices
+        matches : ndarray
+            The matched indices.
         unmatched_tracks : tuple
-            The unmatched track indices
+            The unmatched track indices.
         unmatched_detections : tuple
-            The unmatched detection indices
+            The unmatched detection indices.
         """
         if cost_matrix.size == 0:
             return np.empty((0, 2), dtype=int), tuple(range(cost_matrix.shape[0])), tuple(range(cost_matrix.shape[1]))
