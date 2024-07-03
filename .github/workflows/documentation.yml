@@ -8,10 +8,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Install numpy
-        run: pip install numpy
       - name: Install requirements
-        run: pip install pdoc lapx
+        run: pip install -U pdoc lapx
       - name: Generate documentation
         run: pdoc ./SFSORT.py -t styles/ -o docs/ -d numpy
       - name: Commit changes
