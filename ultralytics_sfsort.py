@@ -6,12 +6,12 @@ from ultralytics import YOLO
 from SFSORT import SFSORT
 
 # Model loading
-session = YOLO('yolov10n.pt', task='detect')
+session = YOLO('yolov8s_1024_person_v2.pt', task='detect')
 # All classes
 names = session.names
 
 # Load the video file
-cap = cv2.VideoCapture('Sample.mp4')
+cap = cv2.VideoCapture('rtk_person_test.mp4')
 fps      = int(cap.get(cv2.CAP_PROP_FPS))
 length   = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 width    = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -23,13 +23,13 @@ out    = cv2.VideoWriter('output.mp4', fourcc, fps, (width, height))
 
 # Organize tracker arguments into standard format
 tracker_arguments = {
-    "dynamic_tuning": True, "cth": 0.7,
-    "high_th": 0.7, "high_th_m": 0.1,
-    "match_th_first": 0.6, "match_th_first_m": 0.05,
-    "match_th_second": 0.4, "low_th": 0.2,
-    "new_track_th": 0.5, "new_track_th_m": 0.1,
-    "marginal_timeout": (7 * fps // 10),
-    "central_timeout": fps,
+    "dynamic_tuning": True, "cth": 0.5,
+    "high_th": 0.3, "high_th_m": 0.1,
+    "match_th_first": 0.8, "match_th_first_m": 0.05,
+    "match_th_second": 0.4, "low_th": 0.1,
+    "new_track_th": 0.3, "new_track_th_m": 0.2,
+    "marginal_timeout": 50,
+    "central_timeout": 60,
     "horizontal_margin": width // 10,
     "vertical_margin": height // 10,
     "frame_width": width,
@@ -49,7 +49,7 @@ for _ in tqdm.tqdm(range(length)):
    # Counting overall time for a single frame inference
    start_time = time.time()
    # Detect people in the frame
-   prediction = session.predict(frame, imgsz=640, conf=0.1, iou=0.45,
+   prediction = session.predict(frame, imgsz=1024, conf=0.3, iou=0.7,
                                 half=False, max_det=100, verbose=False)
    # Exclude additional information from the predictions
    prediction_results = prediction[0].boxes.cpu().numpy()
@@ -89,7 +89,7 @@ for _ in tqdm.tqdm(range(length)):
       name += ' '+str(score)
       # Draw the bounding boxes on the frame
       annotated_frame = cv2.rectangle(frame, (x0, y0), (x1, y1), color, 2)
-      cv2.putText(annotated_frame, name+' '+str(track_id),
+      cv2.putText(annotated_frame, str(track_id), # name if needed
                   (x0, y0-5),
                   cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, thickness=2) 
 
@@ -97,12 +97,12 @@ for _ in tqdm.tqdm(range(length)):
    end_postprocess_time = time.time() - start_postprocess_time
    elapsed_time = time.time() - start_time
    fps = 1 / elapsed_time
-   cv2.putText(annotated_frame, f'{fps:.1f} FPS (overall)',
-      (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,)
-   cv2.putText(annotated_frame, f'{end_tracker_time*1000:.2f} ms (SFSORT)',
-      (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,)
-   cv2.putText(annotated_frame, f'{end_postprocess_time*1000:.2f} ms (post-process)',
-      (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,)
+   # cv2.putText(annotated_frame, f'{fps:.1f} FPS (overall)',
+   #    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,)
+   # cv2.putText(annotated_frame, f'{end_tracker_time*1000:.2f} ms (SFSORT)',
+   #    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,)
+   # cv2.putText(annotated_frame, f'{end_postprocess_time*1000:.2f} ms (post-process)',
+   #    (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA,)
 
    # If key is pressed, close the window
    key = cv2.waitKey(1)

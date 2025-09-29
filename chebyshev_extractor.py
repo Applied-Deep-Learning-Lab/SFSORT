@@ -20,22 +20,22 @@ def color_histogram_feature_extractor(image, bbox, target_size=(64, 128), bins=3
     cropped = image[y1:y2, x1:x2]
     
     # Resize the cropped image to a standard size
-    resized = resize(cropped, target_size, anti_aliasing=True)
+    # resized = resize(cropped, target_size, anti_aliasing=True)
     
     # Convert to LAB color space for better color representation
-    lab_image = color.rgb2lab(resized)
+    lab_image = color.rgb2lab(cropped)
     
     # Compute color histogram for each channel
     L_hist, _ = np.histogram(lab_image[:,:,0], bins=bins, range=(0, 100))
     A_hist, _ = np.histogram(lab_image[:,:,1], bins=bins, range=(-128, 127))
     B_hist, _ = np.histogram(lab_image[:,:,2], bins=bins, range=(-128, 127))
-    
+
     # Concatenate histograms to form the feature vector
     features = np.concatenate((L_hist, A_hist, B_hist))
     
     # Normalize the feature vector
     features_normalized = features / np.sum(features)
-    
+    # print(f"Feats: {features}, Feats_norm:{features_normalized}")
     return features_normalized
 
 def chebyshev_distance(hist1, hist2):

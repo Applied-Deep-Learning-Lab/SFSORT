@@ -2,3 +2,5 @@
 __pycache__/
 *.pt
 *.onnx
+*.mp4
+!Sample.mp4

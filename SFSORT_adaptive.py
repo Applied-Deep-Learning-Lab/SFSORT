@@ -1,5 +1,6 @@
 import numpy as np
 from collections import deque
+from scipy import stats
 
 use_lap = True
 try:
@@ -50,14 +51,15 @@ class SFSORT:
         self.active_tracks = []
         self.lost_tracks = []
         self.confidence_history = deque(maxlen=100)
+        self.iou_history = deque(maxlen=100)
 
     def update_args(self, args):
         args = DotAccess(args)
-        self.base_low_th = args.low_th
-        self.base_match_th_second = args.match_th_second
-        self.base_high_th = args.high_th
-        self.base_match_th_first = args.match_th_first
-        self.base_new_track_th = args.new_track_th
+        # self.base_low_th = args.low_th
+        # self.base_match_th_second = args.match_th_second
+        # self.base_high_th = args.high_th
+        # self.base_match_th_first = args.match_th_first
+        # self.base_new_track_th = args.new_track_th
         self.marginal_timeout = args.marginal_timeout
         self.central_timeout = args.central_timeout
         self.l_margin = args.horizontal_margin
@@ -66,23 +68,29 @@ class SFSORT:
         self.b_margin = args.frame_height - args.vertical_margin
         self.frame_area = args.frame_width * args.frame_height
 
-    def adaptive_thresholds(self, avg_confidence):
-        factor = avg_confidence * 0.9
-        self.low_th = self.base_low_th * factor
-        self.match_th_second = self.base_match_th_second * factor
-        self.high_th = self.base_high_th * factor
-        self.match_th_first = self.base_match_th_first * factor
-        self.new_track_th = self.base_new_track_th * factor
+    def adaptive_thresholds(self, scores, ious):
+        # Use percentiles for thresholds
+        self.low_th = np.percentile(scores, 25)
+        self.high_th = np.percentile(scores, 75)
+        self.new_track_th = np.percentile(scores, 75)
+        
+        # Use IoU statistics for matching thresholds
+        iou_mean, iou_std = np.mean(ious), np.std(ious)
+        self.match_th_first = max(0.3, min(0.7, iou_mean - iou_std))  # Bounded between 0.3 and 0.7
+        self.match_th_second = max(0.1, min(0.5, iou_mean - 2*iou_std))  # Bounded between 0.1 and 0.5
 
     def update(self, boxes, scores, class_ids):
         self.frame_no += 1
         
         # Update confidence history and calculate average
         self.confidence_history.extend(scores)
-        avg_confidence = np.mean(self.confidence_history)
+
+        # Calculate IoUs for this frame's detections
+        ious = self.calculate_pairwise_ious(boxes)
+        self.iou_history.extend(ious.flatten())
         
         # Adapt thresholds
-        self.adaptive_thresholds(avg_confidence)
+        self.adaptive_thresholds(self.confidence_history, self.iou_history)
 
         # Filter small objects
         valid_indices = self.filter_small_objects(boxes)
@@ -267,3 +275,22 @@ class SFSORT:
             unmatched_b = np.where(unmatched.all(0))[0]
 
         return matches, unmatched_a, unmatched_b
+
+    @staticmethod
+    def calculate_pairwise_ious(boxes):
+        x1, y1, x2, y2 = boxes.T
+        areas = (x2 - x1) * (y2 - y1)
+
+        xx1 = np.maximum(x1[:, None], x1)
+        yy1 = np.maximum(y1[:, None], y1)
+        xx2 = np.minimum(x2[:, None], x2)
+        yy2 = np.minimum(y2[:, None], y2)
+
+        w = np.maximum(0, xx2 - xx1)
+        h = np.maximum(0, yy2 - yy1)
+        inter = w * h
+
+        union = areas[:, None] + areas - inter
+        iou = inter / union
+
+        return iou

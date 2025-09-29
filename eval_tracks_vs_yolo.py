@@ -6,6 +6,7 @@ from SFSORT_adaptive import SFSORT
 import cv2
 import tqdm
 import random
+import ffmpeg
 
 
 def calculate_iou(box1, box2):
@@ -66,9 +67,13 @@ def main(args):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    # Define the MP4 codec and create a VideoWriter object
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out    = cv2.VideoWriter('output.mp4', fourcc, fps, (width, height))
+    process = (
+        ffmpeg
+        .input('pipe:', format='rawvideo', pix_fmt='bgr24', s='{}x{}'.format(width, height), framerate=fps)
+        .output("output_sfsort.mp4", vcodec='libx264', pix_fmt='yuv420p', loglevel="quiet")
+        .overwrite_output()
+        .run_async(pipe_stdin=True)
+    )
 
     # Initialize SFSORT tracker
     tracker_arguments = {
@@ -111,6 +116,9 @@ def main(args):
             
         yolo_detections[frame_num] = detections
         total_yolo_detections += len(detections)
+        print(total_yolo_detections)
+        if total_yolo_detections > 1000:
+            break
         
         # Run SFSORT tracker
         tracks = tracker.update(detections.xyxy, detections.conf, detections.cls)
@@ -119,7 +127,7 @@ def main(args):
 
         # Skip additional analysis if the tracker is not currently tracking anyone
         if len(tracks) == 0:
-            out.write(frame)
+            process.stdin.write(frame.tobytes())
             continue
 
         # Extract tracking data from the tracker
@@ -153,7 +161,7 @@ def main(args):
             break
 
         # Write the frame to the output video file
-        out.write(annotated_frame)
+        process.stdin.write(annotated_frame.tobytes())
 
     # Calculate metrics
     id_switches = calculate_id_switches(sfsort_tracks)
@@ -165,7 +173,8 @@ def main(args):
 
     # Release everything when done
     cap.release()
-    out.release()
+    process.stdin.close()
+    process.wait()
     
 
 if __name__ == "__main__":

@@ -232,15 +232,13 @@ class SFSORT:
         next_active_tracks = []
 
         # Remove long-time lost tracks
+        remaining_tracks = []
         for track in self.lost_tracks:
-            if track.state == TrackState.Lost_Central:
-                if self.frame_no - track.last_frame > self.central_timeout:
-                    self.lost_tracks.remove(track)
-                    del track
-            else:
-                if self.frame_no - track.last_frame > self.marginal_timeout:
-                    self.lost_tracks.remove(track)
-                    del track
+            timeout = self.central_timeout if track.state == TrackState.Lost_Central else self.marginal_timeout
+            if self.frame_no - track.last_frame <= timeout:
+                remaining_tracks.append(track)
+        # Update the lost_tracks list with the remaining tracks
+        self.lost_tracks = remaining_tracks
 
         # Gather out all previous tracks
         track_pool = self.active_tracks + self.lost_tracks
@@ -322,8 +320,8 @@ class SFSORT:
         for track in next_lost_tracks:
             if track not in self.lost_tracks:
                 self.lost_tracks.append(track)
-                u = track.bbox[0] + (track.bbox[2] - track.bbox[0]/2)
-                v = track.bbox[1] + (track.bbox[3] - track.bbox[1]/2)
+                u = track.bbox[0] + (track.bbox[2] - track.bbox[0])/2
+                v = track.bbox[1] + (track.bbox[3] - track.bbox[1])/2
                 if (self.l_margin < u < self.r_margin) and (self.t_margin < v < self.b_margin):
                     track.state = TrackState.Lost_Central
                 else:
@@ -440,20 +438,24 @@ class SFSORT:
             The unmatched detection indices.
         """
         if cost_matrix.size == 0:
-            return np.empty((0, 2), dtype=int), tuple(range(cost_matrix.shape[0])), tuple(range(cost_matrix.shape[1]))
+            return (
+                np.empty((0, 2), dtype=int),
+                np.arange(cost_matrix.shape[0]),
+                np.arange(cost_matrix.shape[1])
+            )
 
         if use_lap:
             _, x, y = lap.lapjv(cost_matrix, extend_cost=True, cost_limit=thresh)
-            matches = [[ix, mx] for ix, mx in enumerate(x) if mx >= 0]
-            unmatched_a = np.where(x < 0)[0]
-            unmatched_b = np.where(y < 0)[0]
+            matches = np.array([[i, j] for i, j in enumerate(x) if j >= 0])
+            unmatched_tracks = np.where(x < 0)[0]
+            unmatched_detections = np.where(y < 0)[0]
         else:
-            y, x = linear_sum_assignment(cost_matrix)
-            matches = np.asarray([[i, x] for i, x in enumerate(x) if cost_matrix[i, x] <= thresh])
-            unmatched = np.ones(cost_matrix.shape)
-            for i, xi in matches:
-                unmatched[i, xi] = 0.0
-            unmatched_a = np.where(unmatched.all(1))[0]
-            unmatched_b = np.where(unmatched.all(0))[0]
+            row_indices, col_indices = linear_sum_assignment(cost_matrix)
+            matches = np.array([
+                [i, j] for i, j in zip(row_indices, col_indices) 
+                if cost_matrix[i, j] <= thresh
+            ])
+            unmatched_tracks = np.setdiff1d(np.arange(cost_matrix.shape[0]), row_indices)
+            unmatched_detections = np.setdiff1d(np.arange(cost_matrix.shape[1]), col_indices)
 
-        return matches, unmatched_a, unmatched_b
+        return matches, unmatched_tracks, unmatched_detections

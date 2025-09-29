@@ -22,11 +22,11 @@ class TrackState:
 class Track:
     def __init__(self, bbox, frame_id, track_id, cls_id, score, feature):
         self.track_id = track_id
-        self.update(bbox, frame_id, cls_id, score, feature)
         self.state = TrackState.Active
         self.class_history = deque(maxlen=10)
         self.score_history = deque(maxlen=10)
         self.feature_history = deque(maxlen=5)
+        self.update(bbox, frame_id, cls_id, score, feature)
 
     def update(self, bbox, frame_id, cls_id, score, feature):
         self.bbox = bbox
@@ -185,7 +185,7 @@ class SFSORT:
 
     def filter_small_objects(self, boxes):
         areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
-        return areas > (0.01 * self.frame_area)
+        return areas > (0.001 * self.frame_area)
 
     def remove_lost_tracks(self):
         self.lost_tracks = [track for track in self.lost_tracks if not 
