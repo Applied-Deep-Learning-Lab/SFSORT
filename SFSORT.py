@@ -11,12 +11,7 @@ import numpy as np
 # since the time to solve the linear assignment problem
 # is the shortest for this implementation and it also
 # supports Python 3.12
-use_lap = True
-try:
-    import lap
-except ImportError:
-    from scipy.optimize import linear_sum_assignment
-    use_lap = False
+import lap
 
 
 class DotAccess(dict):
@@ -442,18 +437,9 @@ class SFSORT:
         if cost_matrix.size == 0:
             return np.empty((0, 2), dtype=int), tuple(range(cost_matrix.shape[0])), tuple(range(cost_matrix.shape[1]))
 
-        if use_lap:
-            _, x, y = lap.lapjv(cost_matrix, extend_cost=True, cost_limit=thresh)
-            matches = [[ix, mx] for ix, mx in enumerate(x) if mx >= 0]
-            unmatched_a = np.where(x < 0)[0]
-            unmatched_b = np.where(y < 0)[0]
-        else:
-            y, x = linear_sum_assignment(cost_matrix)
-            matches = np.asarray([[i, x] for i, x in enumerate(x) if cost_matrix[i, x] <= thresh])
-            unmatched = np.ones(cost_matrix.shape)
-            for i, xi in matches:
-                unmatched[i, xi] = 0.0
-            unmatched_a = np.where(unmatched.all(1))[0]
-            unmatched_b = np.where(unmatched.all(0))[0]
+        _, x, y = lap.lapjv(cost_matrix, extend_cost=True, cost_limit=thresh)
+        matches = [[ix, mx] for ix, mx in enumerate(x) if mx >= 0]
+        unmatched_a = np.where(x < 0)[0]
+        unmatched_b = np.where(y < 0)[0]
 
         return matches, unmatched_a, unmatched_b
